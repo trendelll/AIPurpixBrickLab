@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, MouseEvent } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload, ImagePlus, X } from "lucide-react";
@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 export default function PictobrickUploadTemplate() {
   const [images, setImages] = useState<(string | null)[]>(Array(5).fill(null));
 
-  const handleUpload = (index: number, file: File | null) => {
+   const handleUpload = (index: number, file: File | null) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -26,9 +26,62 @@ export default function PictobrickUploadTemplate() {
     setImages(updated);
   };
 
+  function clickEvent(e: MouseEvent<HTMLButtonElement>) {
+      e.preventDefault();
+      window.location.href = "generation";
+  }
+
+  function clickEvent2(e: MouseEvent<HTMLButtonElement>) {
+      e.preventDefault();
+      window.location.href = "applehome";
+  }
+    function clickEvent3(e: MouseEvent<HTMLButtonElement>) {
+      e.preventDefault();
+      window.location.href = "luxuryhome";
+   }
+   
+  function clickEvent4(e: MouseEvent<HTMLButtonElement>) {
+      e.preventDefault();
+      window.location.href = "playfulhome";
+  }
+
+  function clickEvent5(e: MouseEvent<HTMLButtonElement>) {
+      e.preventDefault();
+      window.location.href = "toyotabuild";
+  }
+
+  function clickEvent6(e: MouseEvent<HTMLButtonElement>) {
+      e.preventDefault();
+      window.location.href = "pro";
+   }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black text-white p-6">
       <div className="max-w-5xl mx-auto space-y-8">
+
+        {/* Drop Down */}
+        <div className="dropdown">
+          <button className="dropbtn">Try Our Other Sites</button>
+          <div className="dropdown-content">
+                <Button onClick={clickEvent2} className="px-5 py-3 text-lg rounded-2xl shadow-2xl">
+                  Apple
+                </Button>
+                <Button onClick={clickEvent3} className="px-5 py-3 text-lg rounded-2xl shadow-2xl">
+                  Lux
+                </Button>
+                <Button onClick={clickEvent4} className="px-5 py-3 text-lg rounded-2xl shadow-2xl">
+                  Playful
+                </Button>
+                <Button onClick={clickEvent5} className="px-5 py-3 text-lg rounded-2xl shadow-2xl">
+                  Toyota
+                </Button>
+                <Button onClick={clickEvent6} className="px-5 py-3 text-lg rounded-2xl shadow-2xl">
+                  Pro
+                </Button>
+          </div>
+        </div>
+
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -43,6 +96,7 @@ export default function PictobrickUploadTemplate() {
             Upload up to 5 photos to generate your custom brick design
           </p>
         </motion.div>
+
 
         {/* Upload Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -99,10 +153,11 @@ export default function PictobrickUploadTemplate() {
           transition={{ delay: 0.3 }}
           className="flex flex-col items-center gap-4 pt-4"
         >
-          <Button className="px-10 py-6 text-lg rounded-2xl shadow-2xl">
+          <Button onClick={clickEvent} className="px-10 py-6 text-lg rounded-2xl shadow-2xl">
             <Upload className="mr-2 h-5 w-5" />
             Generate Brick Layout
           </Button>
+
 
           <p className="text-sm text-slate-500">
             Supported formats: JPG, PNG, WEBP
@@ -112,3 +167,4 @@ export default function PictobrickUploadTemplate() {
     </div>
   );
 }
+

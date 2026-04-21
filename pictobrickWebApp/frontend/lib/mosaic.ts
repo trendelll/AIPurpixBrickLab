@@ -155,6 +155,116 @@ export function renderMosaic(
   }
 }
 
+export function renderMosaicWithHighlight(
+  canvas: HTMLCanvasElement,
+  indices: Uint8Array | number[],
+  gridW: number,
+  gridH: number,
+  highlightHex: string,
+  opts: RenderOptions = {}
+) {
+  const brickPx = opts.brickPx ?? 18;
+  renderMosaic(canvas, indices, gridW, gridH, opts);
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "rgba(0,0,0,0.68)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      const idx = indices[y * gridW + x];
+      if (PALETTE[idx].hex !== highlightHex) continue;
+      const c = PALETTE[idx];
+      const px = x * brickPx;
+      const py = y * brickPx;
+      ctx.fillStyle = c.hex;
+      ctx.fillRect(px, py, brickPx, brickPx);
+      if (brickPx >= 6) {
+        const cx = px + brickPx / 2;
+        const cy = py + brickPx / 2;
+        const r = brickPx * 0.32;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.28)";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(0,0,0,0.25)";
+        ctx.lineWidth = Math.max(1, brickPx * 0.06);
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+export function renderBuildStep(
+  canvas: HTMLCanvasElement,
+  indices: Uint8Array | number[],
+  gridW: number,
+  gridH: number,
+  stepHexes: string[],
+  currentStepIdx: number,
+  opts: RenderOptions = {}
+) {
+  const brickPx = opts.brickPx ?? 18;
+  canvas.width = gridW * brickPx;
+  canvas.height = gridH * brickPx;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#0f172a";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const placed = new Set(stepHexes.slice(0, currentStepIdx));
+  const currentHex = stepHexes[currentStepIdx] ?? null;
+
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      const idx = indices[y * gridW + x];
+      const c = PALETTE[idx];
+      const px = x * brickPx;
+      const py = y * brickPx;
+
+      if (c.hex === currentHex) {
+        ctx.fillStyle = c.hex;
+        ctx.fillRect(px, py, brickPx, brickPx);
+        ctx.strokeStyle = "rgba(255,250,180,0.75)";
+        ctx.lineWidth = Math.max(1.5, brickPx * 0.09);
+        ctx.strokeRect(px + 1, py + 1, brickPx - 2, brickPx - 2);
+        if (brickPx >= 6) {
+          const cx = px + brickPx / 2;
+          const cy = py + brickPx / 2;
+          const r = brickPx * 0.32;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255,255,255,0.32)";
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(0,0,0,0.25)";
+          ctx.lineWidth = Math.max(1, brickPx * 0.06);
+          ctx.stroke();
+        }
+      } else if (placed.has(c.hex)) {
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = c.hex;
+        ctx.fillRect(px, py, brickPx, brickPx);
+        if (brickPx >= 6) {
+          const cx = px + brickPx / 2;
+          const cy = py + brickPx / 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, brickPx * 0.32, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255,255,255,0.18)";
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.strokeStyle = "rgba(255,255,255,0.07)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + 0.5, py + 0.5, brickPx - 1, brickPx - 1);
+      }
+    }
+  }
+}
+
 export type PartsRow = { hex: string; name: string; count: number };
 
 export function buildPartsList(indices: Uint8Array | number[]): PartsRow[] {

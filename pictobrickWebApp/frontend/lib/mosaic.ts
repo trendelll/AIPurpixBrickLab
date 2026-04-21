@@ -172,6 +172,55 @@ export function buildPartsList(indices: Uint8Array | number[]): PartsRow[] {
     .sort((a, b) => b.count - a.count);
 }
 
+export function quantizeImageDithered(
+  source: HTMLImageElement | HTMLCanvasElement,
+  gridW: number,
+  gridH: number
+): Uint8Array {
+  const off = document.createElement("canvas");
+  off.width = gridW;
+  off.height = gridH;
+  const ctx = off.getContext("2d", { willReadFrequently: true })!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, 0, 0, gridW, gridH);
+  const { data } = ctx.getImageData(0, 0, gridW, gridH);
+
+  const r = new Float32Array(gridW * gridH);
+  const g = new Float32Array(gridW * gridH);
+  const b = new Float32Array(gridW * gridH);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    r[p] = data[i]; g[p] = data[i + 1]; b[p] = data[i + 2];
+  }
+
+  const indices = new Uint8Array(gridW * gridH);
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      const p = y * gridW + x;
+      const rv = Math.max(0, Math.min(255, r[p]));
+      const gv = Math.max(0, Math.min(255, g[p]));
+      const bv = Math.max(0, Math.min(255, b[p]));
+      const idx = nearestPaletteIndex(rv, gv, bv);
+      indices[p] = idx;
+      const c = PALETTE[idx];
+      const er = rv - c.r, eg = gv - c.g, eb = bv - c.b;
+      if (x + 1 < gridW) {
+        r[p + 1] += er * 7 / 16; g[p + 1] += eg * 7 / 16; b[p + 1] += eb * 7 / 16;
+      }
+      if (y + 1 < gridH) {
+        if (x > 0) {
+          r[p + gridW - 1] += er * 3 / 16; g[p + gridW - 1] += eg * 3 / 16; b[p + gridW - 1] += eb * 3 / 16;
+        }
+        r[p + gridW] += er * 5 / 16; g[p + gridW] += eg * 5 / 16; b[p + gridW] += eb * 5 / 16;
+        if (x + 1 < gridW) {
+          r[p + gridW + 1] += er / 16; g[p + gridW + 1] += eg / 16; b[p + gridW + 1] += eb / 16;
+        }
+      }
+    }
+  }
+  return indices;
+}
+
 export function loadImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -179,6 +228,20 @@ export function loadImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement>
     img.onerror = reject;
     img.src = dataUrl;
   });
+}
+
+export function makeSourceThumbDataUrl(
+  source: HTMLImageElement | HTMLCanvasElement,
+  maxLong = 640
+): string {
+  const w = "naturalWidth" in source ? source.naturalWidth : source.width;
+  const h = "naturalHeight" in source ? source.naturalHeight : source.height;
+  const scale = Math.min(1, maxLong / Math.max(w, h));
+  const c = document.createElement("canvas");
+  c.width = Math.round(w * scale);
+  c.height = Math.round(h * scale);
+  c.getContext("2d")!.drawImage(source, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.82);
 }
 
 export function makeThumbDataUrl(

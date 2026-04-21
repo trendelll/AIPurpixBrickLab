@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Download, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, Download, Trash2, Plus, ImageIcon, Grid2x2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { renderMosaic } from "@/lib/mosaic";
@@ -14,6 +14,7 @@ export default function BuildResultPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
   const [build, setBuild] = useState<StoredBuild | null | undefined>(undefined);
+  const [showOriginal, setShowOriginal] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -91,12 +92,25 @@ export default function BuildResultPage() {
             {build.detail} detail · {totalBricks.toLocaleString()} pieces
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Link href="/create">
             <Button variant="outline" className="border-slate-700 text-slate-200">
               <Plus className="w-4 h-4 mr-2" /> New Build
             </Button>
           </Link>
+          {build.sourceThumbDataUrl && (
+            <Button
+              variant="outline"
+              onClick={() => setShowOriginal((v) => !v)}
+              className="border-slate-700 text-slate-200"
+            >
+              {showOriginal ? (
+                <><Grid2x2 className="w-4 h-4 mr-2" /> Show Mosaic</>
+              ) : (
+                <><ImageIcon className="w-4 h-4 mr-2" /> Show Original</>
+              )}
+            </Button>
+          )}
           <Button
             onClick={handleDownload}
             className="bg-[#f57c00] hover:bg-orange-600 text-white"
@@ -116,9 +130,14 @@ export default function BuildResultPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <Card className="lg:col-span-8 bg-slate-900/40 border-slate-800 p-4 overflow-auto">
           <div className="flex items-center justify-center">
+            <img
+              src={build.sourceThumbDataUrl ?? ""}
+              alt="Original photo"
+              className={`w-full h-auto rounded-lg shadow-2xl shadow-black/40 ${showOriginal && build.sourceThumbDataUrl ? "block" : "hidden"}`}
+            />
             <canvas
               ref={canvasRef}
-              className="max-w-full h-auto rounded-lg shadow-2xl shadow-black/40"
+              className={`w-full h-auto rounded-lg shadow-2xl shadow-black/40 ${showOriginal && build.sourceThumbDataUrl ? "hidden" : "block"}`}
             />
           </div>
         </Card>

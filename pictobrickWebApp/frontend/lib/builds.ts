@@ -9,6 +9,7 @@ export type StoredBuild = {
   gridH: number;
   indices: number[];
   thumbDataUrl: string;
+  sourceThumbDataUrl?: string;
   parts: PartsRow[];
 };
 

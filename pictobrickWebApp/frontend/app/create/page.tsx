@@ -7,8 +7,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, Layers, Smartphone, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-
-type DetailLevel = "Low" | "Medium" | "High";
+import {
+  buildPartsList,
+  gridDimsFor,
+  loadImageFromDataUrl,
+  makeThumbDataUrl,
+  quantizeImage,
+  type DetailLevel,
+} from "@/lib/mosaic";
+import { generateId, saveBuild } from "@/lib/builds";
 
 const DETAIL_LEVELS: DetailLevel[] = ["Low", "Medium", "High"];
 const DETAIL_TO_PERCENT: Record<DetailLevel, string> = {
@@ -22,6 +29,7 @@ export default function BrickLabStudio() {
   const [images, setImages] = useState<(string | null)[]>(Array(5).fill(null));
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [detailLevel, setDetailLevel] = useState<DetailLevel>("Medium");
+  const [buildName, setBuildName] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -63,10 +71,39 @@ export default function BrickLabStudio() {
   const generateLayout = async () => {
     if (!hasAnyImage || isGenerating) return;
     setIsGenerating(true);
-    // TODO: POST images + detailLevel to FastAPI once the backend endpoint exists.
-    // Simulating generation for now so the flow is clickable end-to-end.
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    router.push("/my-builds");
+    try {
+      const sources = images.filter((src): src is string => src !== null);
+      const createdAt = new Date().toISOString();
+      const savedIds: string[] = [];
+      for (let i = 0; i < sources.length; i++) {
+        const img = await loadImageFromDataUrl(sources[i]);
+        const { gridW, gridH } = gridDimsFor(detailLevel, img.width, img.height);
+        const indices = quantizeImage(img, gridW, gridH);
+        const thumb = makeThumbDataUrl(indices, gridW, gridH);
+        const parts = buildPartsList(indices);
+        const id = generateId();
+        const base = buildName.trim() || `Build ${new Date().toLocaleDateString()}`;
+        saveBuild({
+          id,
+          title: sources.length > 1 ? `${base} #${i + 1}` : base,
+          createdAt,
+          detail: detailLevel,
+          gridW,
+          gridH,
+          indices: Array.from(indices),
+          thumbDataUrl: thumb,
+          parts,
+        });
+        savedIds.push(id);
+      }
+      if (savedIds.length === 1) {
+        router.push(`/build/${savedIds[0]}`);
+      } else {
+        router.push("/my-builds");
+      }
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -206,8 +243,21 @@ export default function BrickLabStudio() {
         <div className="lg:col-span-4 flex flex-col gap-6">
           <Card className="bg-white border-slate-200 shadow-xl shadow-slate-200/50 p-6 flex-1 flex flex-col">
             <h3 className="text-lg font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4">Configuration</h3>
-            
+
             <div className="space-y-6 flex-1">
+              <div className="space-y-2">
+                <label className="text-sm text-slate-600 font-medium">Build Name</label>
+                <input
+                  type="text"
+                  value={buildName}
+                  onChange={(e) => setBuildName(e.target.value)}
+                  disabled={isGenerating}
+                  placeholder={`Build ${new Date().toLocaleDateString()}`}
+                  maxLength={60}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#004b87]/30 focus:border-[#004b87] disabled:opacity-50"
+                />
+              </div>
+
               <div className="space-y-2">
                 <div className="flex justify-between text-sm text-slate-600 font-medium">
                   <span>Rendering Detail</span>

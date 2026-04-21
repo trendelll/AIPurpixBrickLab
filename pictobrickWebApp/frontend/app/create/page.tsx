@@ -2,15 +2,30 @@
 
 import { useState, useRef } from "react";
 import Script from 'next/script';
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, X, Layers, Smartphone, ScanLine, ArrowRight } from "lucide-react";
+import { Upload, X, Layers, Smartphone, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
+type DetailLevel = "Low" | "Medium" | "High";
+
+const DETAIL_LEVELS: DetailLevel[] = ["Low", "Medium", "High"];
+const DETAIL_TO_PERCENT: Record<DetailLevel, string> = {
+  Low: "33%",
+  Medium: "66%",
+  High: "100%",
+};
+
 export default function BrickLabStudio() {
+  const router = useRouter();
   const [images, setImages] = useState<(string | null)[]>(Array(5).fill(null));
   const [activeIndex, setActiveIndex] = useState<number>(0);
+  const [detailLevel, setDetailLevel] = useState<DetailLevel>("Medium");
+  const [isGenerating, setIsGenerating] = useState(false);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const hasAnyImage = images.some((img) => img !== null);
 
   const handleUpload = (index: number, file: File | null) => {
     if (!file) return;
@@ -34,6 +49,24 @@ export default function BrickLabStudio() {
 
   const triggerUpload = (index: number) => {
     fileInputRefs.current[index]?.click();
+  };
+
+  const clearAll = () => {
+    if (!hasAnyImage) return;
+    setImages(Array(5).fill(null));
+    setActiveIndex(0);
+    fileInputRefs.current.forEach((el) => {
+      if (el) el.value = "";
+    });
+  };
+
+  const generateLayout = async () => {
+    if (!hasAnyImage || isGenerating) return;
+    setIsGenerating(true);
+    // TODO: POST images + detailLevel to FastAPI once the backend endpoint exists.
+    // Simulating generation for now so the flow is clickable end-to-end.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    router.push("/my-builds");
   };
 
   return (
@@ -67,7 +100,12 @@ export default function BrickLabStudio() {
                 {images.filter(Boolean).length} / 5 Assets Ready
               </p>
             </div>
-            <Button variant="outline" className="border-slate-300 hover:bg-slate-100 text-slate-600">
+            <Button
+              variant="outline"
+              onClick={clearAll}
+              disabled={!hasAnyImage || isGenerating}
+              className="border-slate-300 hover:bg-slate-100 text-slate-600"
+            >
               Clear All
             </Button>
           </motion.div>
@@ -142,7 +180,7 @@ export default function BrickLabStudio() {
 
                 {img ? (
                   <>
-                    <img src={img} className="w-full h-full object-cover" />
+                    <img src={img} alt={`Upload ${i + 1}`} className="w-full h-full object-cover" />
                     <button
                       onClick={(e) => removeImage(e, i)}
                       className="absolute top-1 right-1 bg-white/80 hover:bg-red-50 text-red-600 p-1 rounded-md transition-colors shadow-sm"
@@ -150,7 +188,7 @@ export default function BrickLabStudio() {
                       <X className="w-3 h-3" />
                     </button>
                     {activeIndex === i && (
-                      <div className="absolute inset-0 ring-4 ring-inset ring-[#f57c00]/20 rounded-xl" />
+                      <div className="absolute inset-0 ring-4 ring-inset ring-[#f57c00]/20 rounded-xl pointer-events-none" />
                     )}
                   </>
                 ) : (
@@ -173,14 +211,13 @@ export default function BrickLabStudio() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm text-slate-600 font-medium">
                   <span>Rendering Detail</span>
-                  <span className="text-[#004b87]">High</span>
+                  <span className="text-[#004b87]">{detailLevel}</span>
                 </div>
                 <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: "75%" }}
-                    transition={{ delay: 0.5, duration: 1 }}
-                    className="h-full bg-gradient-to-r from-[#f57c00] to-orange-400" 
+                  <motion.div
+                    animate={{ width: DETAIL_TO_PERCENT[detailLevel] }}
+                    transition={{ duration: 0.4 }}
+                    className="h-full bg-gradient-to-r from-[#f57c00] to-orange-400"
                   />
                 </div>
               </div>
@@ -188,14 +225,24 @@ export default function BrickLabStudio() {
               <div className="space-y-2">
                 <label className="text-sm text-slate-600 font-medium">Detail Level</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {['Low', 'Medium', 'High'].map((size, index) => (
-                    <button 
-                      key={size} 
-                      className={`py-2 rounded-lg text-sm font-medium transition ${index === 1 ? 'bg-[#004b87] text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
-                    >
-                      {size}
-                    </button>
-                  ))}
+                  {DETAIL_LEVELS.map((level) => {
+                    const isActive = detailLevel === level;
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => setDetailLevel(level)}
+                        disabled={isGenerating}
+                        className={`py-2 rounded-lg text-sm font-medium transition ${
+                          isActive
+                            ? "bg-[#004b87] text-white shadow-md"
+                            : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {level}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -212,12 +259,22 @@ export default function BrickLabStudio() {
               </div>
             </div>
 
-            <Button 
+            <Button
+              onClick={generateLayout}
+              disabled={!hasAnyImage || isGenerating}
               className="w-full py-7 text-lg bg-[#f57c00] hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20 mt-6 group font-bold"
-              disabled={images.every(img => img === null)}
             >
-              Generate Layout
-              <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              {isGenerating ? (
+                <>
+                  <Loader2 className="mr-2 w-5 h-5 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  Generate Layout
+                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </Button>
           </Card>
         </div>

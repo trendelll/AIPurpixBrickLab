@@ -13,8 +13,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.frontend
+      args:
+        # NEXT_PUBLIC_* is inlined into the client JS bundle at build time.
+        # Safe to commit — Clerk publishable keys are public by design.
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_bWVhc3VyZWQtY29sbGllLTc3LmNsZXJrLmFjY291bnRzLmRldiQ
     ports:
       - "3000:3000"
+    env_file:
+      - .env.local    # secrets (CLERK_SECRET_KEY) — gitignored, share via password manager
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -22,6 +28,7 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:3000
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/pictobrick
       REDIS_URL: redis://redis:6379
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_bWVhc3VyZWQtY29sbGllLTc3LmNsZXJrLmFjY291bnRzLmRldiQ
     depends_on:
       - postgres
       - redis

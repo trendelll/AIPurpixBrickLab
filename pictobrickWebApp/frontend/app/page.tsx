@@ -2,6 +2,7 @@
 
 import { motion, Variants } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, Image as ImageIcon, SlidersHorizontal, Box, Layers, ArrowUpRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
@@ -90,13 +91,16 @@ export default function HomePage() {
                 <div className="w-3 h-3 rounded-full bg-slate-200" />
                 <div className="w-3 h-3 rounded-full bg-slate-200" />
               </div>
-              {/* Fake App Stage */}
-              <div className="flex-1 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center overflow-hidden relative group">
-                <div className="absolute inset-0 bg-[linear-gradient(45deg,#004b870a_25%,transparent_25%,transparent_75%,#004b870a_75%,#004b870a),linear-gradient(45deg,#004b870a_25%,transparent_25%,transparent_75%,#004b870a_75%,#004b870a)] bg-[length:20px_20px] bg-[position:0_0,10px_10px]" />
-                <div className="text-center relative z-10">
-                  <Box className="w-12 h-12 text-[#004b87] opacity-50 mx-auto mb-3" />
-                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Live Rendering</p>
-                </div>
+              {/* Live Rendering Stage */}
+              <div className="flex-1 bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden relative group">
+                <Image
+                  src="/Frontpagehouse.png"
+                  alt="Live brick rendering preview"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
+                  priority
+                />
               </div>
             </Card>
           </motion.div>

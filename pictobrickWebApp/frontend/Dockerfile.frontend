@@ -13,6 +13,10 @@ RUN --mount=type=bind,source=package.json,target=package.json \
 
 # ---- build ----
 FROM base AS build
+# NEXT_PUBLIC_* vars must exist as ENV during `next build` so Next.js can
+# inline them into the client JS bundle. Populated from compose build.args.
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

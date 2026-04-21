@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import Navbar from "@/components/Navbar"; // Make sure you created this file in your components folder!
 
@@ -27,34 +28,39 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0f172a] text-slate-200 min-h-screen flex flex-col`}
-      >
-        {/* The Navbar stays at the top of every page */}
-        <Navbar />
+    <ClerkProvider
+      afterSignOutUrl="/"
+      appearance={{ variables: { colorPrimary: "#4f46e5" } }}
+    >
+      <html lang="en" className="dark">
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0f172a] text-slate-200 min-h-screen flex flex-col`}
+        >
+          {/* The Navbar stays at the top of every page */}
+          <Navbar />
 
-        {/* Main content wrapper. 
-            pt-20 provides space so the fixed Navbar doesn't cover your content.
-        */}
-        <main className="flex-grow pt-20">
-          {children}
-        </main>
+          {/* Main content wrapper.
+              pt-20 provides space so the fixed Navbar doesn't cover your content.
+          */}
+          <main className="flex-grow pt-20">
+            {children}
+          </main>
 
-        {/* Simple Footer to make the site feel finished */}
-        <footer className="border-t border-slate-800 bg-[#0f172a] py-8 mt-auto">
-          <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-slate-500">
-              © {new Date().getFullYear()} PictoBrick Studio. All rights reserved.
-            </p>
-            <div className="flex gap-6 text-sm text-slate-400">
-              <a href="#" className="hover:text-white transition">Terms</a>
-              <a href="#" className="hover:text-white transition">Privacy</a>
-              <a href="#" className="hover:text-white transition">Support</a>
+          {/* Simple Footer to make the site feel finished */}
+          <footer className="border-t border-slate-800 bg-[#0f172a] py-8 mt-auto">
+            <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+              <p className="text-sm text-slate-500">
+                © {new Date().getFullYear()} PictoBrick Studio. All rights reserved.
+              </p>
+              <div className="flex gap-6 text-sm text-slate-400">
+                <a href="#" className="hover:text-white transition">Terms</a>
+                <a href="#" className="hover:text-white transition">Privacy</a>
+                <a href="#" className="hover:text-white transition">Support</a>
+              </div>
             </div>
-          </div>
-        </footer>
-      </body>
-    </html>
+          </footer>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

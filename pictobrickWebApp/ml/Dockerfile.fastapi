@@ -1,0 +1,29 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Heavy deps first — cached layer, only rebuilt when these change
+RUN pip install --no-cache-dir \
+    "numpy<2" \
+    pillow \
+    torch \
+    torchvision \
+    --extra-index-url https://download.pytorch.org/whl/cpu
+
+RUN pip install --no-cache-dir \
+    "transformers>=4.40,<5.0" \
+    "accelerate>=0.30" \
+    "fastapi>=0.110" \
+    "uvicorn[standard]>=0.29" \
+    "pydantic>=2,<3"
+
+# Pre-download the depth model into the image so first request is instant
+RUN python -c "\
+from transformers import pipeline; \
+pipe = pipeline('depth-estimation', model='depth-anything/Depth-Anything-V2-Small-hf', device=-1); \
+print('Model cached.')"
+
+COPY app.py .
+
+EXPOSE 8000
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

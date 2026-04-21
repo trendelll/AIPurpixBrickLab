@@ -32,8 +32,7 @@ services:
     depends_on:
       - postgres
       - redis
-    # uncomment when fastapi service exists:
-    # - fastapi
+      - fastapi
 
   postgres:
     image: postgres:15-alpine
@@ -51,19 +50,18 @@ services:
     ports:
       - "6379:6379"       # exposed for local dev/debugging
 
-  # --- coming soon ---
-  # fastapi:
-  #   build:
-  #     context: ./ml
-  #     dockerfile: Dockerfile.fastapi
-  #   ports:
-  #     - "8000:8000"
-  #   environment:
-  #     REDIS_URL: redis://redis:6379
-  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/pictobrick
-  #   depends_on:
-  #     - postgres
-  #     - redis
+  fastapi:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile.fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/pictobrick
+    depends_on:
+      - postgres
+      - redis
 
 volumes:
   postgres_data:

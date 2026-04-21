@@ -9,11 +9,16 @@ interface Props {
   indices: number[];
   gridW: number;
   gridH: number;
+  depths?: number[] | null;
+  hoveredHex?: string | null;
 }
 
-export default function MosaicViewer3D({ indices, gridW, gridH }: Props) {
+export default function MosaicViewer3D({ indices, gridW, gridH, depths, hoveredHex }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+  const bodyMeshRef = useRef<THREE.InstancedMesh | null>(null);
+  const studMeshRef = useRef<THREE.InstancedMesh | null>(null);
+  const instanceHexesRef = useRef<string[]>([]);
   const [autoRotate, setAutoRotate] = useState(true);
   const [loaded, setLoaded] = useState(false);
 
@@ -24,7 +29,6 @@ export default function MosaicViewer3D({ indices, gridW, gridH }: Props) {
     const W = el.clientWidth || 800;
     const H = el.clientHeight || 520;
 
-    // Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(W, H);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -32,35 +36,43 @@ export default function MosaicViewer3D({ indices, gridW, gridH }: Props) {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     el.appendChild(renderer.domElement);
 
-    // Scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0f172a);
-    scene.fog = new THREE.FogExp2(0x0f172a, 0.005);
+    scene.fog = new THREE.FogExp2(0x0f172a, 0.004);
+
+    const BRICK_W = 0.9, BRICK_H = 0.32, BRICK_D = 0.9;
+    const STUD_R = 0.215, STUD_H = 0.14;
+
+    // Compute total instances (one per brick in every column)
+    const maxColumnHeight = depths
+      ? Math.max(...depths)
+      : 1;
+    const total = depths
+      ? depths.reduce((s, h) => s + h, 0)
+      : gridW * gridH;
 
     // Camera
     const diag = Math.sqrt(gridW * gridW + gridH * gridH);
+    const modelH = maxColumnHeight * BRICK_H;
     const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 2000);
-    camera.position.set(0, diag * 0.55, diag * 0.9);
-    camera.lookAt(0, 0, 0);
+    camera.position.set(0, Math.max(diag * 0.45, modelH * 2), diag * 0.9);
+    camera.lookAt(0, modelH * 0.4, 0);
 
     // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambient);
-
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     const sun = new THREE.DirectionalLight(0xfff8e7, 1.1);
-    sun.position.set(gridW * 0.4, gridH * 1.0, gridW * 0.3);
+    sun.position.set(gridW * 0.4, gridH + modelH, gridW * 0.3);
     sun.castShadow = true;
     sun.shadow.mapSize.setScalar(2048);
     sun.shadow.camera.near = 0.1;
     sun.shadow.camera.far = diag * 4;
     sun.shadow.camera.left = -gridW;
     sun.shadow.camera.right = gridW;
-    sun.shadow.camera.top = gridH;
+    sun.shadow.camera.top = gridH + modelH;
     sun.shadow.camera.bottom = -gridH;
     scene.add(sun);
-
     const fill = new THREE.DirectionalLight(0xc8d8ff, 0.28);
-    fill.position.set(-gridW, gridH * 0.5, -gridH * 0.3);
+    fill.position.set(-gridW, modelH, -gridH * 0.3);
     scene.add(fill);
 
     // Controls
@@ -70,20 +82,17 @@ export default function MosaicViewer3D({ indices, gridW, gridH }: Props) {
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.55;
     controls.minDistance = 3;
-    controls.maxDistance = diag * 2.8;
-    controls.maxPolarAngle = Math.PI / 1.8;
+    controls.maxDistance = diag * 3;
+    controls.maxPolarAngle = Math.PI / 1.7;
+    controls.target.set(0, modelH * 0.3, 0);
     controlsRef.current = controls;
 
-    // Brick geometry
-    const BRICK_W = 0.9, BRICK_H = 0.32, BRICK_D = 0.9;
-    const STUD_R = 0.215, STUD_H = 0.14;
+    // Geometries + materials
     const bodyGeo = new THREE.BoxGeometry(BRICK_W, BRICK_H, BRICK_D);
     const studGeo = new THREE.CylinderGeometry(STUD_R, STUD_R, STUD_H, 16);
-
     const bodyMat = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.0 });
     const studMat = new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.0 });
 
-    const total = gridW * gridH;
     const bodyMesh = new THREE.InstancedMesh(bodyGeo, bodyMat, total);
     const studMesh = new THREE.InstancedMesh(studGeo, studMat, total);
     bodyMesh.castShadow = true;
@@ -95,34 +104,49 @@ export default function MosaicViewer3D({ indices, gridW, gridH }: Props) {
     const offX = (gridW - 1) / 2;
     const offZ = (gridH - 1) / 2;
 
+    const instanceHexes: string[] = new Array(total);
+    let idx = 0;
     for (let y = 0; y < gridH; y++) {
       for (let x = 0; x < gridW; x++) {
-        const i = y * gridW + x;
-        const hex = PALETTE[indices[i]].hex;
+        const cell = y * gridW + x;
+        const hex = PALETTE[indices[cell]].hex;
+        const colH = depths ? depths[cell] : 1;
         const wx = x - offX;
         const wz = y - offZ;
 
-        dummy.position.set(wx, BRICK_H / 2, wz);
-        dummy.rotation.set(0, 0, 0);
-        dummy.scale.set(1, 1, 1);
-        dummy.updateMatrix();
-        bodyMesh.setMatrixAt(i, dummy.matrix);
-        color.set(hex);
-        bodyMesh.setColorAt(i, color);
+        for (let lvl = 0; lvl < colH; lvl++) {
+          const wy = (lvl + 0.5) * BRICK_H;
+          dummy.position.set(wx, wy, wz);
+          dummy.rotation.set(0, 0, 0);
+          dummy.scale.set(1, 1, 1);
+          dummy.updateMatrix();
+          bodyMesh.setMatrixAt(idx, dummy.matrix);
+          color.set(hex);
+          bodyMesh.setColorAt(idx, color);
 
-        dummy.position.set(wx, BRICK_H + STUD_H / 2, wz);
-        dummy.updateMatrix();
-        studMesh.setMatrixAt(i, dummy.matrix);
-        color.set(hex);
-        color.offsetHSL(0, 0, 0.07);
-        studMesh.setColorAt(i, color);
+          dummy.position.set(wx, (lvl + 1) * BRICK_H + STUD_H / 2, wz);
+          dummy.updateMatrix();
+          studMesh.setMatrixAt(idx, dummy.matrix);
+          color.set(hex);
+          color.offsetHSL(0, 0, 0.07);
+          studMesh.setColorAt(idx, color);
+
+          instanceHexes[idx] = hex;
+          idx++;
+        }
       }
     }
+
+    instanceHexesRef.current = instanceHexes;
 
     bodyMesh.instanceMatrix.needsUpdate = true;
     studMesh.instanceMatrix.needsUpdate = true;
     if (bodyMesh.instanceColor) bodyMesh.instanceColor.needsUpdate = true;
     if (studMesh.instanceColor) studMesh.instanceColor.needsUpdate = true;
+
+    bodyMeshRef.current = bodyMesh;
+    studMeshRef.current = studMesh;
+
     scene.add(bodyMesh);
     scene.add(studMesh);
 
@@ -136,7 +160,6 @@ export default function MosaicViewer3D({ indices, gridW, gridH }: Props) {
 
     setLoaded(true);
 
-    // Animate
     let animId: number;
     const animate = () => {
       animId = requestAnimationFrame(animate);
@@ -145,10 +168,8 @@ export default function MosaicViewer3D({ indices, gridW, gridH }: Props) {
     };
     animate();
 
-    // Resize
     const ro = new ResizeObserver(() => {
-      const w = el.clientWidth;
-      const h = el.clientHeight;
+      const w = el.clientWidth, h = el.clientHeight;
       if (!w || !h) return;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
@@ -171,7 +192,28 @@ export default function MosaicViewer3D({ indices, gridW, gridH }: Props) {
       controlsRef.current = null;
       setLoaded(false);
     };
-  }, [indices, gridW, gridH]);
+  }, [indices, gridW, gridH, depths]);
+
+  useEffect(() => {
+    const body = bodyMeshRef.current;
+    const stud = studMeshRef.current;
+    const hexes = instanceHexesRef.current;
+    if (!body || !stud || !hexes.length) return;
+
+    const c = new THREE.Color();
+    for (let i = 0; i < hexes.length; i++) {
+      const hex = hexes[i];
+      const dim = hoveredHex !== null && hoveredHex !== undefined && hex !== hoveredHex;
+      c.set(hex);
+      if (dim) c.multiplyScalar(0.15);
+      body.setColorAt(i, c);
+      c.set(hex).offsetHSL(0, 0, 0.07);
+      if (dim) c.multiplyScalar(0.15);
+      stud.setColorAt(i, c);
+    }
+    if (body.instanceColor) body.instanceColor.needsUpdate = true;
+    if (stud.instanceColor) stud.instanceColor.needsUpdate = true;
+  }, [hoveredHex]);
 
   useEffect(() => {
     if (controlsRef.current) controlsRef.current.autoRotate = autoRotate;

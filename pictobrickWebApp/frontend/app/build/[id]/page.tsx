@@ -18,6 +18,7 @@ import {
   renderBuildStep,
 } from "@/lib/mosaic";
 import { deleteBuild, getBuild, sizeLabel, type StoredBuild } from "@/lib/builds";
+import { fetchDepthGrid } from "@/lib/depth";
 
 export default function BuildResultPage() {
   const router = useRouter();
@@ -27,6 +28,8 @@ export default function BuildResultPage() {
   const [build, setBuild] = useState<StoredBuild | null | undefined>(undefined);
   const [showOriginal, setShowOriginal] = useState(false);
   const [show3D, setShow3D] = useState(false);
+  const [depths, setDepths] = useState<number[] | null>(null);
+  const [depthStatus, setDepthStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
   const [hoveredHex, setHoveredHex] = useState<string | null>(null);
   const [buildMode, setBuildMode] = useState(false);
   const [buildStep, setBuildStep] = useState(0);
@@ -51,6 +54,20 @@ export default function BuildResultPage() {
       renderMosaic(canvasRef.current, indices, gridW, gridH, { brickPx });
     }
   }, [build, showOriginal, show3D, hoveredHex, buildMode, buildStep]);
+
+  // Fetch depth grid from ML service when 3D view opens (once per build session)
+  useEffect(() => {
+    if (!show3D || !build?.sourceThumbDataUrl || depthStatus !== "idle") return;
+    setDepthStatus("loading");
+    fetchDepthGrid(build.sourceThumbDataUrl, build.gridW, build.gridH).then((result) => {
+      if (result) {
+        setDepths(result);
+        setDepthStatus("ready");
+      } else {
+        setDepthStatus("unavailable");
+      }
+    });
+  }, [show3D, build, depthStatus]);
 
   const stepHexes = build?.parts.map(p => p.hex) ?? [];
   const totalSteps = stepHexes.length;
@@ -204,8 +221,29 @@ export default function BuildResultPage() {
 
           <Card className="bg-slate-900/40 border-slate-800 p-4 overflow-hidden">
             {show3D ? (
-              <div className="h-[520px] rounded-lg overflow-hidden">
-                <MosaicViewer3D indices={build.indices} gridW={build.gridW} gridH={build.gridH} />
+              <div className="h-[520px] rounded-lg overflow-hidden relative">
+                <MosaicViewer3D
+                  indices={build.indices}
+                  gridW={build.gridW}
+                  gridH={build.gridH}
+                  depths={depths}
+                  hoveredHex={hoveredHex}
+                />
+                {depthStatus === "loading" && (
+                  <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-slate-900/80 backdrop-blur-sm border border-slate-700 rounded-full text-xs text-slate-300">
+                    Generating depth map…
+                  </div>
+                )}
+                {depthStatus === "ready" && (
+                  <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-indigo-500/20 backdrop-blur-sm border border-indigo-500/40 rounded-full text-xs text-indigo-300">
+                    AI depth · bas-relief mode
+                  </div>
+                )}
+                {depthStatus === "unavailable" && (
+                  <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-slate-900/80 backdrop-blur-sm border border-slate-700 rounded-full text-xs text-slate-400">
+                    Flat view · ML service offline
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center justify-center">

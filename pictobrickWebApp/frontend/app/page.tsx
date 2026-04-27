@@ -62,29 +62,48 @@ export default function HomePage() {
           </motion.div>
 
           {/* Hero Mockup (Matches the Studio Card Style) */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95, rotate: 1 }}
             animate={{ opacity: 1, scale: 1, rotate: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
             className="relative"
           >
-            <Card className="bg-white/80 backdrop-blur-xl border border-slate-200 shadow-2xl shadow-slate-200/60 p-4 rounded-3xl aspect-[4/3] flex flex-col">
+            <Card className="bg-white/80 backdrop-blur-xl border border-slate-200 shadow-2xl shadow-slate-200/60 p-4 rounded-3xl flex flex-col gap-3">
               {/* Fake App Header */}
-              <div className="flex items-center gap-2 mb-4 px-2">
-                <div className="w-3 h-3 rounded-full bg-slate-200" />
-                <div className="w-3 h-3 rounded-full bg-slate-200" />
-                <div className="w-3 h-3 rounded-full bg-slate-200" />
+              <div className="flex items-center gap-2 px-2">
+                <div className="w-3 h-3 rounded-full bg-red-300" />
+                <div className="w-3 h-3 rounded-full bg-yellow-300" />
+                <div className="w-3 h-3 rounded-full bg-green-300" />
               </div>
-              {/* Live Rendering Stage */}
-              <div className="flex-1 bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden relative group">
-                <Image
-                  src="/Frontpagehouse.png"
-                  alt="Live brick rendering preview"
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="object-cover"
-                  priority
-                />
+
+              {/* Photo 1 — HouseBrickSet (4:3) */}
+              <div className="flex flex-col gap-1.5">
+                <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-2xl overflow-hidden">
+                  <Image
+                    src="/HouseBrickSet.png"
+                    alt="House brick set"
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    className="object-contain"
+                    priority
+                  />
+                </div>
+                <p className="text-center text-xs font-semibold text-slate-400 tracking-wide uppercase"></p>
+              </div>
+
+              {/* Photo 2 — HouseToLego (16:9) */}
+              <div className="flex flex-col gap-1.5">
+                <div className="relative w-full aspect-video bg-slate-100 rounded-2xl overflow-hidden">
+                  <Image
+                    src="/HouseToLego.png"
+                    alt="House converted to LEGO mosaic"
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    className="object-contain"
+                    priority
+                  />
+                </div>
+                <p className="text-center text-xs font-semibold text-slate-400 tracking-wide uppercase"></p>
               </div>
             </Card>
           </motion.div>

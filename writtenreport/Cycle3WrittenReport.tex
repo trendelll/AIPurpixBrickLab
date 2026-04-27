@@ -1,0 +1,548 @@
+\documentclass[12pt]{article}
+
+% Packages
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{booktabs}
+\usepackage{ulem}
+\usepackage{fancyhdr}
+\usepackage{tocloft}
+\usepackage{float}
+\usepackage{needspace}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue
+}
+
+% Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Cycle 3 Written Report}
+\lhead{COMP 4710 Senior Design}
+\cfoot{\thepage}
+
+\begin{document}
+
+%----------------------------
+% Title Page
+%----------------------------
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    {\LARGE \textbf{Cycle 3 Written Report}\\[1em]}
+    {\large \textbf{Authors:}\\[0.5em]}
+    {\large
+        Trey Wendell\\
+        Nathan Ferguson\\
+        Patrick Bozeki\\
+        Elizabeth Floyd\\
+        Alan Leonard\\[1.5em]
+    }
+    {\large COMP 4710 Senior Design\\[0.5em]}
+    {\large Department of Computer Science and Software Engineering\\
+    Samuel Ginn College of Engineering, Auburn University\\}
+    \vfill
+\end{titlepage}
+
+%----------------------------
+% Table of Contents
+%----------------------------
+\tableofcontents
+\newpage
+
+%----------------------------
+% 1. Executive Summary
+%----------------------------
+\section{System Metaphor (Executive Summary)}
+
+Our system allows users to upload photos and transform them into buildable
+LEGO\textsuperscript{\textregistered}-style brick mosaics and 3D sculptures,
+complete with step-by-step building instructions and a full parts list.
+Cycle 3 was the most feature-intensive cycle to date, delivering the complete
+mosaic generation pipeline, an animated build guide, an AI-powered 3D mosaic
+viewer, and a brand new 3D Model Builder that reconstructs a full LEGO sculpture
+from a user-uploaded orbit video or multi-angle photo set.
+
+The web application is built with Next.js (App Router), React, Tailwind CSS,
+Three.js for 3D rendering, and a Python FastAPI service that hosts the machine
+learning models. The entire stack runs in Docker Compose for local development
+and is deployed to AWS Amplify (frontend) with a separate container host for the
+ML service.
+
+%----------------------------
+% 2. Sprint Goals
+%----------------------------
+\section{Sprint Goals}
+
+The goals established at the start of Cycle 3 were:
+
+\begin{enumerate}[leftmargin=*]
+    \item Implement end-to-end mosaic generation with color dithering and a live
+          animated preview.
+    \item Build a detailed result page with an interactive parts list, a
+          before/after photo comparison, and step-by-step build guide
+          instructions.
+    \item Integrate a real-time 3D WebGL viewer that uses AI depth estimation to
+          sculpt the mosaic into a bas-relief LEGO plaque.
+    \item Deliver a 3D Model Builder that accepts user video or photos and
+          produces a downloadable GLB model of a full LEGO sculpture.
+    \item Containerize the ML service and resolve all blocking CI/CD issues to
+          enable a live AWS Amplify deployment.
+\end{enumerate}
+
+All five goals were completed by the end of the cycle.
+
+%----------------------------
+% 3. System Architecture
+%----------------------------
+\section{System Architecture}
+
+The application is organized as a monorepo with two primary services:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Service} & \textbf{Technology} & \textbf{Port} \\
+\midrule
+Frontend  & Next.js 16, React 19, Tailwind v4, Three.js & 3000 \\
+ML API    & Python 3.11, FastAPI, Depth Anything V2      & 8000 \\
+Database  & PostgreSQL (reserved)                         & 5432 \\
+Cache     & Redis (reserved)                              & 6379 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Docker Compose orchestrates all four services. The ML service ships in two
+variants: a lightweight \texttt{Dockerfile.fastapi} (depth endpoint only,
+suitable for free-tier hosts) and a \texttt{Dockerfile.pipeline} that includes
+COLMAP, Open3D, and all geometry dependencies needed for full 3D reconstruction.
+
+All generative routes are protected by Clerk authentication
+(\texttt{/create}, \texttt{/build/*}, \texttt{/my-builds},
+\texttt{/create-3d}, \texttt{/model/*}).
+
+%----------------------------
+% 4. Features Implemented
+%----------------------------
+\section{Features Implemented}
+
+\subsection{Mosaic Generation (\texttt{/create} page)}
+
+Users can upload up to five photos on the create page. The system quantizes
+each image to a fixed 22-color LEGO palette using Floyd-Steinberg dithering,
+which spreads color error to neighboring pixels and produces smooth tonal
+gradients that closely approximate the original photograph. Three detail levels
+control the resolution of the output mosaic:
+
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+\textbf{Detail Level} & \textbf{Long-edge (studs)} \\
+\midrule
+Low    & 48 \\
+Medium & 72 \\
+High   & 104 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A live animated preview plays immediately after upload: a glowing orange
+scan-line sweeps across the canvas as the mosaic is drawn in, and re-plays
+whenever the user switches detail levels. The finished build is saved to
+browser \texttt{localStorage} along with a custom name and routed to the
+result page.
+
+\subsection{Build Result Page (\texttt{/build/[id]})}
+
+The result page combines several interactive features into a single view:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Interactive parts list with hover highlighting.} Hovering any
+          color row in the parts list dims all other bricks in the canvas,
+          making it straightforward to locate a specific color group while
+          building.
+
+    \item \textbf{Before/After toggle.} A single button swaps between the
+          original uploaded photo and the completed mosaic so users can judge
+          the color translation at a glance.
+
+    \item \textbf{Build Guide mode.} A step-through instruction mode modelled
+          after official LEGO instructions. Each step isolates exactly one
+          color; a progress bar tracks how many steps remain; and users can
+          jump to any step by clicking the corresponding row in the parts list.
+
+    \item \textbf{Export.} Users can download the mosaic as a PNG image or as
+          a \texttt{.glb} 3D model file compatible with Blender and any
+          WebGL-capable viewer.
+\end{itemize}
+
+\subsection{3D Mosaic Viewer with AI Depth Sculpting}
+
+Clicking the 3D View button on the result page opens a full Three.js WebGL
+scene. Each brick is rendered as a beveled box geometry with a cylindrical
+stud on top; \texttt{THREE.InstancedMesh} is used throughout so the scene
+remains interactive even for large mosaics with tens of thousands of bricks.
+Orbit controls with damping let the user inspect the model from any angle, and
+auto-rotate plays on load. Hover highlighting from the parts list is
+synchronized into the 3D scene in real time by updating instance colors on the
+\texttt{InstancedMesh}.
+
+The central AI feature is \textbf{bas-relief depth sculpting}. When 3D View
+opens, the frontend encodes the original photo as base64 and sends it to the
+ML service:
+
+\begin{verbatim}
+POST /api/depth-grid
+{ "image_b64": "...", "grid_w": 72, "grid_h": 54, "max_height": 8 }
+\end{verbatim}
+
+The service runs \textbf{Depth Anything V2 Small} (a state-of-the-art
+monocular depth estimation model) to produce a per-cell height map, which is
+returned to the frontend. Each brick column is then stacked to the
+corresponding height, sculpting the flat mosaic into a 3D bas-relief plaque.
+If the ML service is unavailable the viewer falls back to a single-layer flat
+mosaic with a status indicator, so the page never breaks.
+
+\subsection{3D Model Builder (\texttt{/create-3d} page)}
+
+The 3D Model Builder allows users to upload an orbit video of any physical
+object (10--30 seconds) or a ZIP of multi-angle photos (30--60 images). The
+pipeline then reconstructs a full 3D LEGO sculpture and delivers it as a
+downloadable GLB file.
+
+\textbf{Frontend workflow:} After the user drops a file into the drag-and-drop
+zone and clicks \textit{Start 3D Reconstruction}, the file is uploaded to the
+ML service via \texttt{POST /api/ml/jobs}. A job ID is returned immediately and
+the page begins polling:
+
+\begin{verbatim}
+GET /api/ml/jobs/${jobId}    // every 3 seconds
+\end{verbatim}
+
+A real-time elapsed timer increments every second so the user can gauge
+progress. Full reconstruction typically takes 5--15 minutes depending on input
+length. When the job status changes to \texttt{done}, the user is automatically
+redirected to \texttt{/model/[jobId]}, where the finished GLB is rendered in
+the \texttt{GlbViewer} component (orbit controls, auto-rotate, ACES filmic
+tone-mapping).
+
+\textbf{ML service pipeline:} Jobs are managed in an in-process thread pool
+(\texttt{ThreadPoolExecutor}, 2 workers). Each job transitions through states
+\texttt{PENDING} $\to$ \texttt{RUNNING} $\to$ \texttt{DONE} (or
+\texttt{FAILED}). The full reconstruction pipeline---sparse reconstruction with
+COLMAP, dense fusion with Open3D TSDF, brickification, and GLB export---runs in
+a background thread imported from the \texttt{ptb\_ml} package. The default
+lightweight container returns a descriptive error rather than crashing if the
+pipeline dependencies are not present.
+
+\textbf{API routes} proxying to the ML service:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Route} & \textbf{Purpose} \\
+\midrule
+\texttt{POST /api/ml/jobs}             & Upload file, start job, return \texttt{job\_id} \\
+\texttt{GET  /api/ml/jobs/[jobId]}     & Poll status and progress string \\
+\texttt{GET  /api/ml/jobs/[jobId]/glb} & Stream finished GLB to browser \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Standalone Demo Script}
+
+A command-line script (\texttt{ml/scripts/generate\_demo.py}) was added so
+developers and evaluators can generate a GLB from a single image without
+running Docker or the web application. It uses the same Floyd-Steinberg
+quantization and Depth Anything V2 depth pipeline as the web app:
+
+\begin{verbatim}
+python3 scripts/generate_demo.py dog.jpg demo.glb --size 96 --max-height 12
+\end{verbatim}
+
+A \texttt{--flat} flag skips depth estimation for a quick flat-mosaic plaque.
+The script prints a parts-list summary (color name and brick count per color)
+to the terminal on completion. A sample \texttt{dog.jpg} and a pre-generated
+\texttt{demo.glb} were committed alongside the script.
+
+%----------------------------
+% 5. Testing
+%----------------------------
+\section{Testing}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mosaic correctness.} The dithering output was verified visually
+          across multiple reference photos at all three detail levels, confirming
+          that color transitions are smooth and the output closely matches the
+          original image's palette.
+
+    \item \textbf{3D viewer performance.} Mosaics at the High detail level
+          (104-stud long edge) with depth sculpting enabled were profiled in
+          Chrome DevTools; the scene maintained interactive frame rates using
+          \texttt{InstancedMesh}.
+
+    \item \textbf{ML endpoint.} The \texttt{/api/depth-grid} endpoint was tested
+          end-to-end via the web app on several photos, and the generated
+          height maps were verified to produce plausible bas-relief geometry in
+          the 3D viewer.
+
+    \item \textbf{3D pipeline.} The standalone \texttt{generate\_demo.py} script
+          was run against a sample image to confirm that the depth model loads,
+          quantization runs, and a valid GLB is written to disk. The committed
+          \texttt{demo.glb} serves as a reference artifact.
+
+    \item \textbf{Docker builds.} \texttt{docker compose up --build} was tested
+          from a clean checkout to confirm that all four services start and
+          that the frontend is accessible at \texttt{localhost:3000}.
+\end{itemize}
+
+%----------------------------
+% 6. Team Contributions
+%----------------------------
+\section{Team Contributions}
+
+\begin{center}
+\begin{tabular}{lp{9cm}}
+\toprule
+\textbf{Member} & \textbf{Contributions} \\
+\midrule
+Trey Wendell &
+    3D Model Builder (\texttt{/create-3d} page, job API routes, GLB viewer
+    component), FastAPI job queue, \texttt{Dockerfile.pipeline},
+    standalone demo script, README, AWS Amplify deployment config \\[0.5em]
+Nathan Ferguson &
+    Depth Anything V2 integration, \texttt{/api/depth-grid} endpoint,
+    depth-driven bas-relief sculpting in \texttt{MosaicViewer3D} \\[0.5em]
+Patrick Bozeki &
+    Three.js 3D mosaic viewer (\texttt{MosaicViewer3D} component),
+    instanced brick geometry, orbit controls, hover highlight sync \\[0.5em]
+Alan Leonard &
+    Mosaic generation (\texttt{/create} page), scan-line animation,
+    Floyd-Steinberg dithering, \texttt{/my-builds} page, Clerk
+    middleware updates \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%----------------------------
+% 7. Obstacles and Resolutions
+%----------------------------
+\section{Obstacles and Resolutions}
+
+\needspace{4\baselineskip}
+\subsection{Broken DSINE Submodule Blocking CI}
+
+A stale Git submodule pointer at \texttt{ml/vendor/DSINE} caused every AWS
+Amplify build to fail immediately. The pointer was removed from the repository,
+unblocking CI without affecting runtime functionality because DSINE was not yet
+consumed by any live code path.
+
+\needspace{4\baselineskip}
+\subsection{\texttt{.dockerignore} Excluding the Build Route}
+
+The Next.js \texttt{build/} output directory pattern in
+\texttt{.dockerignore} was inadvertently also excluding the
+\texttt{app/build/} route directory, causing the result page to return 404
+inside the Docker container. The ignore rule was made more specific so that
+only the Next.js \texttt{.next/} build cache is excluded.
+
+\needspace{4\baselineskip}
+\subsection{Keeping the Default Image Lightweight}
+
+The full COLMAP reconstruction pipeline adds several gigabytes of dependencies.
+To keep the default Docker image deployable on free-tier container hosts, the
+pipeline dependencies are only present in \texttt{Dockerfile.pipeline}. The
+\texttt{\_run\_pipeline} function in \texttt{app.py} catches the resulting
+\texttt{ImportError} gracefully and marks the job as \texttt{FAILED} with a
+human-readable error message rather than crashing the server.
+
+%----------------------------
+% 8. Retrospective
+%----------------------------
+\section{Retrospective}
+
+\subsection{What Went Well}
+
+\begin{itemize}[leftmargin=*]
+    \item The Three.js \texttt{InstancedMesh} approach scaled to large mosaics
+          without performance issues, validating the architecture choice early.
+    \item Separating the lightweight and full-pipeline Docker images kept
+          deployment options flexible and avoided forcing all team members to
+          download the large pipeline image for everyday development.
+    \item The scan-line animation created a strong sense of visual feedback
+          that received positive reactions during internal demos.
+\end{itemize}
+
+\subsection{What Could Be Improved}
+
+\begin{itemize}[leftmargin=*]
+    \item Build and mosaic data are currently persisted only in
+          \texttt{localStorage}, which prevents cross-device access and makes
+          the data fragile. Moving to the PostgreSQL service is the highest
+          priority for Cycle 4.
+    \item The ML job queue has no rate limiting or concurrency guard beyond
+          the two-worker thread pool, which could become a problem under
+          simultaneous users.
+    \item Mobile layout was not addressed this cycle; all pages are designed
+          for desktop viewports.
+\end{itemize}
+
+%----------------------------
+% 9. Plans for Next Cycle
+%----------------------------
+\section{Plans for Next Cycle}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Database persistence.} Migrate build storage from
+          \texttt{localStorage} to PostgreSQL so builds are accessible across
+          devices and users.
+    \item \textbf{Redis job queue.} Use Redis to queue and rate-limit ML jobs,
+          preventing server overload under concurrent requests.
+    \item \textbf{Brick cost estimator.} Add a real-time cost estimate to
+          the parts list using current LEGO market prices from the BrickLink
+          API.
+    \item \textbf{Improved depth model.} Evaluate upgrading from Depth
+          Anything V2 Small to the Medium or Large variant for higher-quality
+          bas-relief sculpting on complex scenes.
+    \item \textbf{Mobile-responsive layout.} Audit and update all pages for
+          usability on mobile screen sizes.
+\end{enumerate}
+
+%----------------------------
+% 10. Meeting Minutes
+%----------------------------
+\newpage
+\section{Meeting Minutes}
+
+\subsection{Team Meeting --- April 7, 2026}
+
+\textbf{Attendees:} Trey Wendell, Nathan Ferguson, Patrick Bozeki, Alan Leonard\\
+\textbf{Location:} Google Meet (remote) \quad \textbf{Duration:} 60 min\\[0.5em]
+
+\textbf{Discussion:}
+\begin{itemize}[leftmargin=*]
+    \item Reviewed Cycle 2 feedback and agreed on Cycle 3 feature priorities.
+    \item Assigned mosaic generation, scan-line animation, and \texttt{/my-builds} page to Alan Leonard.
+    \item Assigned Three.js 3D mosaic viewer with instanced brick geometry to Patrick Bozeki.
+    \item Assigned Depth Anything V2 integration and \texttt{/api/depth-grid} endpoint to Nathan Ferguson.
+    \item Assigned 3D Model Builder (\texttt{/create-3d}), FastAPI job queue, and AWS Amplify deployment to Trey Wendell.
+    \item Agreed to use Docker Compose for local development with all four services.
+\end{itemize}
+
+\textbf{Action Items:}
+\begin{itemize}[leftmargin=*]
+    \item All members: verify local Docker Compose stack builds and runs cleanly.
+    \item Trey: assess COLMAP pipeline feasibility and stand up \texttt{Dockerfile.pipeline}.
+    \item Nathan: prototype the depth estimation endpoint and confirm the Depth Anything V2 model downloads correctly.
+    \item Alan: scaffold \texttt{/create} page and wire up Floyd-Steinberg dithering library.
+\end{itemize}
+
+\vspace{1em}
+\subsection{Team Meeting --- April 14, 2026}
+
+\textbf{Attendees:} Trey Wendell, Nathan Ferguson, Patrick Bozeki, Alan Leonard\\
+\textbf{Location:} Google Meet (remote) \quad \textbf{Duration:} 60 min\\[0.5em]
+
+\textbf{Discussion:}
+\begin{itemize}[leftmargin=*]
+    \item Alan demoed working mosaic generation at all three detail levels (Low 48, Medium 72, High 104 studs); scan-line animation was functional.
+    \item Nathan confirmed \texttt{POST /api/depth-grid} endpoint returning per-cell height maps from Depth Anything V2 Small.
+    \item Patrick showed early Three.js scene with instanced brick bodies; stud geometry and orbit controls still in progress.
+    \item Trey reported FastAPI job queue operational with \texttt{PENDING} $\to$ \texttt{RUNNING} $\to$ \texttt{DONE} state transitions; \texttt{/create-3d} polling loop wired up.
+    \item Identified that \texttt{.dockerignore} was excluding the \texttt{app/build/} route; assigned fix to Trey.
+\end{itemize}
+
+\textbf{Action Items:}
+\begin{itemize}[leftmargin=*]
+    \item Patrick: add stud geometry, shadow maps, and hover highlight sync to 3D viewer.
+    \item Nathan: integrate depth grid response into \texttt{MosaicViewer3D} to drive column heights.
+    \item Alan: implement build guide step-through mode and before/after toggle on result page.
+    \item Trey: fix \texttt{.dockerignore}, resolve broken DSINE submodule blocking Amplify CI, and add standalone demo script.
+\end{itemize}
+
+\vspace{1em}
+\subsection{Team Meeting --- April 21, 2026}
+
+\textbf{Attendees:} Trey Wendell, Nathan Ferguson, Patrick Bozeki, Alan Leonard\\
+\textbf{Location:} Google Meet (remote) \quad \textbf{Duration:} 60 min\\[0.5em]
+
+\textbf{Discussion:}
+\begin{itemize}[leftmargin=*]
+    \item Merged all feature branches into \texttt{main}; resolved integration conflicts between the 3D viewer and depth endpoint changes.
+    \item Confirmed \texttt{.dockerignore} fix resolved the \texttt{/build/[id]} 404 errors inside the container.
+    \item Confirmed removal of DSINE submodule pointer unblocked Amplify CI; build pipeline now passes.
+    \item Patrick demoed completed \texttt{MosaicViewer3D} with stud geometry, shadow maps, auto-rotate, and real-time hover highlight sync from the parts list.
+    \item Nathan confirmed bas-relief depth sculpting working end-to-end: depth grid from ML service drives per-column brick heights in the 3D viewer.
+    \item End-to-end walkthrough of all Cycle 3 features confirmed all five sprint goals complete.
+\end{itemize}
+
+\textbf{Action Items:}
+\begin{itemize}[leftmargin=*]
+    \item Trey: finalize README with full architecture documentation and deployment guide.
+    \item All members: review written report draft before the April 28 meeting.
+\end{itemize}
+
+\vspace{1em}
+\subsection{Team Meeting --- April 28, 2026}
+
+\textbf{Attendees:} Trey Wendell, Nathan Ferguson, Patrick Bozeki, Alan Leonard\\
+\textbf{Location:} Google Meet (remote) \quad \textbf{Duration:} 60 min\\[0.5em]
+
+\textbf{Discussion:}
+\begin{itemize}[leftmargin=*]
+    \item Reviewed Cycle 3 written report as a group; confirmed accuracy of all sections.
+    \item Discussed Cycle 4 priorities: database persistence via PostgreSQL, Redis job queue, and brick cost estimator.
+    \item Agreed that mobile-responsive layout should be addressed early in Cycle 4 rather than deferred again.
+    \item Reviewed live Amplify deployment; confirmed frontend accessible and ML service reachable via \texttt{FASTAPI\_INTERNAL\_URL}.
+\end{itemize}
+
+\textbf{Action Items:}
+\begin{itemize}[leftmargin=*]
+    \item All members: finalize and submit Cycle 3 written report.
+    \item Trey: open Cycle 4 planning tickets and set up PostgreSQL schema for build persistence.
+    \item Nathan: benchmark Depth Anything V2 Medium vs.\ Small to assess quality improvement for bas-relief sculpting.
+\end{itemize}
+
+%----------------------------
+% 11. Sponsor Approval
+%----------------------------
+\newpage
+\section{Sponsor Approval}
+
+The undersigned sponsor representative has reviewed the Cycle 3 deliverables
+for the AIPurpixBrickLab / PictoBrick project and approves the work completed
+during this cycle.
+
+\vspace{2em}
+
+\noindent
+\begin{tabular}{p{7cm} p{5cm}}
+\rule{6.5cm}{0.4pt} & \rule{4.5cm}{0.4pt} \\
+Sponsor Representative Signature   & Date \\[2.5em]
+\rule{6.5cm}{0.4pt} & \\
+Printed Name \& Title              & \\
+\end{tabular}
+
+\vspace{3em}
+
+\noindent
+The undersigned faculty advisor has reviewed and approved this report.
+
+\vspace{2em}
+
+\noindent
+\begin{tabular}{p{7cm} p{5cm}}
+\rule{6.5cm}{0.4pt} & \rule{4.5cm}{0.4pt} \\
+Faculty Advisor Signature          & Date \\[2.5em]
+\rule{6.5cm}{0.4pt} & \\
+Printed Name \& Title              & \\
+\end{tabular}
+
+\end{document}

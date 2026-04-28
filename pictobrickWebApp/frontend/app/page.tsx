@@ -76,12 +76,12 @@ export default function HomePage() {
                 <div className="w-3 h-3 rounded-full bg-green-300" />
               </div>
 
-              {/* Photo 1 — HouseBrickSet (4:3) */}
+              {/* Photo 1 — HouseToLego (16:9) */}
               <div className="flex flex-col gap-1.5">
-                <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-2xl overflow-hidden">
+                <div className="relative w-full aspect-video bg-slate-100 rounded-2xl overflow-hidden">
                   <Image
-                    src="/HouseBrickSet.png"
-                    alt="House brick set"
+                    src="/HouseToLego.png"
+                    alt="House converted to LEGO mosaic"
                     fill
                     sizes="(max-width: 1024px) 100vw, 50vw"
                     className="object-contain"
@@ -91,12 +91,12 @@ export default function HomePage() {
                 <p className="text-center text-xs font-semibold text-slate-400 tracking-wide uppercase"></p>
               </div>
 
-              {/* Photo 2 — HouseToLego (16:9) */}
+              {/* Photo 2 — HouseBrickSet (4:3) */}
               <div className="flex flex-col gap-1.5">
-                <div className="relative w-full aspect-video bg-slate-100 rounded-2xl overflow-hidden">
+                <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-2xl overflow-hidden">
                   <Image
-                    src="/HouseToLego.png"
-                    alt="House converted to LEGO mosaic"
+                    src="/HouseBrickSet.png"
+                    alt="House brick set"
                     fill
                     sizes="(max-width: 1024px) 100vw, 50vw"
                     className="object-contain"
